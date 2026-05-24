@@ -346,15 +346,24 @@ function JobCard({ job }: { job: Job }) {
             <Briefcase className="h-3.5 w-3.5" />
             {job.company}
           </p>
+          {job.location && (
+            <p className="mt-1 flex items-center gap-1.5 truncate text-sm text-muted-foreground">
+              <MapPin className="h-3.5 w-3.5" />
+              {job.location}
+            </p>
+          )}
         </div>
         <span className="shrink-0 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
-          {job.match_score}
+          {job.score}
         </span>
       </div>
 
-      <p className="mt-4 flex-1 text-sm leading-relaxed text-muted-foreground">
-        {job.reason}
-      </p>
+      {job.skills && (
+        <p className="mt-4 flex-1 text-sm leading-relaxed text-muted-foreground">
+          <span className="font-medium text-foreground">Skills: </span>
+          {job.skills}
+        </p>
+      )}
 
       <a
         href={job.url}
