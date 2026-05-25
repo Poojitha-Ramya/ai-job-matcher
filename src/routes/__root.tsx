@@ -8,6 +8,8 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 
+import { AuthProvider } from "../hooks/use-auth";
+import { ThemeProvider } from "../hooks/use-theme";
 import appCss from "../styles.css?url";
 import { Toaster } from "sonner";
 
@@ -73,14 +75,19 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { title: "AI Job Matcher" },
+      {
+        name: "description",
+        content: "Premium AI-powered job and internship platform for students and freshers",
+      },
+      { name: "author", content: "AI Job Matcher" },
+      { property: "og:title", content: "AI Job Matcher" },
+      {
+        property: "og:description",
+        content: "Premium AI-powered job and internship platform for students and freshers",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Lovable" },
     ],
     links: [
       {
@@ -113,9 +120,13 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <Outlet />
-      <Toaster position="top-right" richColors />
-    </QueryClientProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <QueryClientProvider client={queryClient}>
+          <Outlet />
+          <Toaster position="top-right" richColors />
+        </QueryClientProvider>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
