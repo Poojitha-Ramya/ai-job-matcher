@@ -938,8 +938,8 @@ function Dashboard() {
       </div>
 
       {/* MAIN CONTAINER */}
-      <main className="flex-1 overflow-y-auto px-4 md:px-8 py-6 md:py-8 mt-16 md:mt-0">
-        <div className="mx-auto max-w-5xl space-y-8">
+      <main className="flex-1 min-w-0 overflow-y-auto px-4 md:px-8 py-6 md:py-8 mt-16 md:mt-0">
+        <div className="mx-auto max-w-5xl w-full space-y-8">
           {/* TAB 1: RESUME MATCHER */}
           {activeTab === "matcher" && (
             <div className="space-y-6">
@@ -1209,13 +1209,13 @@ function Dashboard() {
                         No matches found. Try a resume with different keywords.
                       </Card>
                     ) : (
-                      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                      <div className="grid w-full gap-5 sm:grid-cols-2 lg:grid-cols-3">
                         {jobs.map((job, i) => {
                           const isBookmarked = savedJobs.some((sj) => sj.url === job.url);
                           return (
                             <Card
                               key={i}
-                              className="group flex flex-col justify-between p-5 shadow-elegant hover:-translate-y-1 transition-all duration-300 border-border hover:border-primary/20"
+                              className="group flex flex-col justify-between p-5 shadow-elegant hover:-translate-y-1 transition-all duration-300 border-border hover:border-primary/20 min-w-0"
                             >
                               <div className="space-y-3">
                                 <div className="flex items-start justify-between gap-2">
@@ -1424,13 +1424,13 @@ function Dashboard() {
                     </div>
                   </Card>
                 ) : (
-                  <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="grid w-full gap-5 sm:grid-cols-2 lg:grid-cols-3">
                     {searchResults.map((job, i) => {
                       const isBookmarked = savedJobs.some((sj) => sj.url === job.url);
                       return (
                         <Card
                           key={i}
-                          className="group flex flex-col justify-between p-5 shadow-elegant hover:-translate-y-1 transition-all duration-300 border-border hover:border-primary/20"
+                          className="group flex flex-col justify-between p-5 shadow-elegant hover:-translate-y-1 transition-all duration-300 border-border hover:border-primary/20 min-w-0"
                         >
                           <div className="space-y-3">
                             <div className="flex items-start justify-between gap-2">
@@ -1542,11 +1542,11 @@ function Dashboard() {
                   </div>
                 </Card>
               ) : (
-                <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid w-full gap-5 sm:grid-cols-2 lg:grid-cols-3">
                   {savedJobs.map((job, i) => (
                     <Card
                       key={i}
-                      className="group flex flex-col justify-between p-5 shadow-elegant hover:-translate-y-1 transition-all duration-300 border-border hover:border-primary/20"
+                      className="group flex flex-col justify-between p-5 shadow-elegant hover:-translate-y-1 transition-all duration-300 border-border hover:border-primary/20 min-w-0"
                     >
                       <div className="space-y-3">
                         <div className="flex items-start justify-between gap-2">

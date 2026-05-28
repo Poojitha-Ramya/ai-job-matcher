@@ -110,28 +110,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
-    // 1. Get initial session
-    supabase.auth.getSession().then(async ({ data: { session: initialSession } }) => {
-      sessionRef.current = initialSession;
-      userRef.current = initialSession?.user ?? null;
+    let isMounted = true;
 
-      setSession(initialSession);
-      setUser(initialSession?.user ?? null);
-      setIsLoading(false);
-
-      if (initialSession?.user) {
-        const p = await fetchProfile(initialSession.user.id);
-        setProfile(p);
-      }
-    }).catch(err => {
-      console.error("Error getting session:", err);
-      setIsLoading(false);
-    });
-
-    // 2. Listen for auth changes
+    // Listen for auth changes (this fires INITIAL_SESSION synchronously/immediately)
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
+      if (!isMounted) return;
+
       const prevSession = sessionRef.current;
       const prevUser = userRef.current;
 
@@ -147,19 +133,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       sessionRef.current = currentSession;
       userRef.current = currentSession?.user ?? null;
 
+      // Update auth states immediately
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
       setIsLoading(false);
 
       if (currentSession?.user) {
         const p = await fetchProfile(currentSession.user.id);
-        setProfile(p);
+        if (isMounted) {
+          setProfile(p);
+        }
       } else {
         setProfile(null);
       }
     });
 
     return () => {
+      isMounted = false;
       subscription.unsubscribe();
     };
   }, [checkConfig, fetchProfile]);
