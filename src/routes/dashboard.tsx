@@ -94,9 +94,10 @@ const STEPS = [
 const ACCEPTED_EXTS = [".pdf", ".doc", ".docx"];
 
 function Dashboard() {
-  const { user, profile, isLoading: authLoading, signOut, updateProfile, isMockMode } = useAuth();
+  const { user, profile, isLoading: authLoading, signOut, updateProfile, isMockMode, incrementTrialsUsed } = useAuth();
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
+  const trialsUsed = user?.user_metadata?.trials_used || 0;
 
   const [activeTab, setActiveTab] = useState<ActiveTab>("matcher");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -419,6 +420,15 @@ function Dashboard() {
 
   const handleResumeSubmit = async () => {
     if (!file) return;
+
+    // Check trials
+    if (trialsUsed >= 3) {
+      toast.error("Free trial limit reached", {
+        description: "You have used all 3 free trials. Please upgrade for unlimited resume matches.",
+      });
+      return;
+    }
+
     setMatcherPhase("loading");
     startLoadingSteps();
 
@@ -528,6 +538,9 @@ function Dashboard() {
         ats_score: derivedScore,
         resume_name: file.name,
       });
+
+      // Increment trials count
+      await incrementTrialsUsed();
     } catch (err) {
       console.error(err);
       clearTimers();
@@ -943,70 +956,101 @@ function Dashboard() {
 
               {matcherPhase === "upload" && (
                 <div className="max-w-2xl mx-auto rounded-2xl border border-border bg-card p-6 shadow-elegant md:p-8 space-y-6">
-                  <div
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      setDragOver(true);
-                    }}
-                    onDragLeave={() => setDragOver(false)}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      setDragOver(false);
-                      handleFile(e.dataTransfer.files?.[0]);
-                    }}
-                    onClick={() => inputRef.current?.click()}
-                    className={[
-                      "group relative flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-12 text-center transition-all",
-                      dragOver
-                        ? "border-primary bg-primary/5 scale-[1.01]"
-                        : "border-border bg-muted/20 hover:border-primary/50 hover:bg-muted/40",
-                    ].join(" ")}
-                  >
-                    <input
-                      ref={inputRef}
-                      type="file"
-                      accept=".pdf,.doc,.docx"
-                      className="hidden"
-                      onChange={(e) => handleFile(e.target.files?.[0])}
-                    />
-                    <div className="rounded-full bg-primary/10 p-4 text-primary transition-transform group-hover:scale-110">
-                      <Upload className="h-7 w-7" />
+                  {/* Trial status banner */}
+                  <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 flex items-center justify-between">
+                    <div className="space-y-1">
+                      <h4 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                        <Sparkles className="h-4 w-4 text-primary shrink-0 animate-pulse" />
+                        Free Trial Usage
+                      </h4>
+                      <p className="text-xs text-muted-foreground">
+                        You get 3 free resume matches per account.
+                      </p>
                     </div>
-                    <p className="mt-4 text-base font-semibold text-foreground">
-                      Drag &amp; drop your resume here
-                    </p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      or click to browse from files (PDF, DOC, DOCX)
-                    </p>
+                    <div className="text-right">
+                      <span className="text-lg font-bold text-primary">
+                        {Math.max(0, 3 - trialsUsed)}
+                      </span>
+                      <span className="text-xs text-muted-foreground"> / 3 remaining</span>
+                    </div>
                   </div>
 
-                  {file && (
-                    <div className="flex items-center justify-between rounded-xl border border-border bg-muted/30 px-4 py-3">
-                      <div className="flex min-w-0 items-center gap-3">
-                        <div className="rounded-lg bg-primary/10 p-2 text-primary">
-                          <FileText className="h-4 w-4" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-foreground">
-                            {file.name}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {(file.size / 1024).toFixed(1)} KB
-                          </p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => setFile(null)}
-                        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
-                      >
-                        <X className="h-3.5 w-3.5" /> Remove
-                      </button>
+                  {trialsUsed >= 3 ? (
+                    <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-6 text-center space-y-3">
+                      <AlertCircle className="h-8 w-8 text-destructive mx-auto" />
+                      <h4 className="text-sm font-bold text-foreground">Trial Limit Reached</h4>
+                      <p className="text-xs text-muted-foreground max-w-sm mx-auto leading-relaxed">
+                        You have used all 3 free resume matches for <strong>{user?.email}</strong>. Upgrade your subscription to continue matching resumes.
+                      </p>
                     </div>
+                  ) : (
+                    <>
+                      <div
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          setDragOver(true);
+                        }}
+                        onDragLeave={() => setDragOver(false)}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          setDragOver(false);
+                          handleFile(e.dataTransfer.files?.[0]);
+                        }}
+                        onClick={() => inputRef.current?.click()}
+                        className={[
+                          "group relative flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-12 text-center transition-all",
+                          dragOver
+                            ? "border-primary bg-primary/5 scale-[1.01]"
+                            : "border-border bg-muted/20 hover:border-primary/50 hover:bg-muted/40",
+                        ].join(" ")}
+                      >
+                        <input
+                          ref={inputRef}
+                          type="file"
+                          accept=".pdf,.doc,.docx"
+                          className="hidden"
+                          onChange={(e) => handleFile(e.target.files?.[0])}
+                        />
+                        <div className="rounded-full bg-primary/10 p-4 text-primary transition-transform group-hover:scale-110">
+                          <Upload className="h-7 w-7" />
+                        </div>
+                        <p className="mt-4 text-base font-semibold text-foreground">
+                          Drag &amp; drop your resume here
+                        </p>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          or click to browse from files (PDF, DOC, DOCX)
+                        </p>
+                      </div>
+
+                      {file && (
+                        <div className="flex items-center justify-between rounded-xl border border-border bg-muted/30 px-4 py-3">
+                          <div className="flex min-w-0 items-center gap-3 flex-1">
+                            <div className="rounded-lg bg-primary/10 p-2 text-primary shrink-0">
+                              <FileText className="h-4 w-4" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm font-semibold text-foreground">
+                                {file.name}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {(file.size / 1024).toFixed(1)} KB
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => setFile(null)}
+                            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:bg-background hover:text-foreground shrink-0 ml-2"
+                          >
+                            <X className="h-3.5 w-3.5" /> Remove
+                          </button>
+                        </div>
+                      )}
+                    </>
                   )}
 
                   <Button
                     onClick={handleResumeSubmit}
-                    disabled={!file}
+                    disabled={!file || trialsUsed >= 3}
                     className="h-12 w-full rounded-xl text-base font-semibold shadow-elegant"
                   >
                     <Sparkles className="mr-2 h-4 w-4" />
@@ -1175,7 +1219,7 @@ function Dashboard() {
                             >
                               <div className="space-y-3">
                                 <div className="flex items-start justify-between gap-2">
-                                  <div className="min-w-0">
+                                  <div className="min-w-0 flex-1">
                                     <h3
                                       onClick={() => setSelectedJob(job)}
                                       className="font-bold text-foreground text-sm hover:text-primary hover:underline cursor-pointer truncate"
@@ -1390,7 +1434,7 @@ function Dashboard() {
                         >
                           <div className="space-y-3">
                             <div className="flex items-start justify-between gap-2">
-                              <div className="min-w-0">
+                              <div className="min-w-0 flex-1">
                                 <h3
                                   onClick={() => setSelectedJob(job)}
                                   className="font-bold text-foreground text-sm hover:text-primary hover:underline cursor-pointer truncate"
@@ -1506,7 +1550,7 @@ function Dashboard() {
                     >
                       <div className="space-y-3">
                         <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
+                          <div className="min-w-0 flex-1">
                             <h3
                               onClick={() => setSelectedJob(job)}
                               className="font-bold text-foreground text-sm hover:text-primary hover:underline cursor-pointer truncate"

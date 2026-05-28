@@ -18,6 +18,7 @@ create table if not exists public.user_profiles (
   preferred_role text,
   preferred_location text,
   job_type text default 'All',
+  trials_used integer default 0,
   updated_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 

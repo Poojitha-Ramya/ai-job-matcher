@@ -17,6 +17,7 @@ export interface UserProfile {
   preferred_location: string | null;
   job_type: string;
   updated_at: string;
+  trials_used?: number;
 }
 
 interface AuthContextType {
@@ -30,6 +31,7 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<UserProfile>) => Promise<boolean>;
   refreshProfile: () => Promise<void>;
+  incrementTrialsUsed: () => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -90,6 +92,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (savedMockSession) {
         try {
           const parsed = JSON.parse(savedMockSession);
+          // Set mock trials
+          const mockTrials = Number(localStorage.getItem(`mock_trials_${parsed.user.id}`) || "0");
+          parsed.user.user_metadata = {
+            ...parsed.user.user_metadata,
+            trials_used: mockTrials
+          };
           setUser(parsed.user);
           setProfile(parsed.profile);
           userRef.current = parsed.user;
@@ -109,11 +117,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       setSession(initialSession);
       setUser(initialSession?.user ?? null);
+      setIsLoading(false);
 
       if (initialSession?.user) {
         const p = await fetchProfile(initialSession.user.id);
         setProfile(p);
       }
+    }).catch(err => {
+      console.error("Error getting session:", err);
       setIsLoading(false);
     });
 
@@ -138,6 +149,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
+      setIsLoading(false);
 
       if (currentSession?.user) {
         const p = await fetchProfile(currentSession.user.id);
@@ -145,7 +157,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else {
         setProfile(null);
       }
-      setIsLoading(false);
     });
 
     return () => {
@@ -289,12 +300,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { error } = await supabase.auth.signOut();
       if (error) {
         toast.error("Sign out failed", { description: error.message });
+        // Clear local session state anyway to prevent being stuck in a corrupted session
+        setUser(null);
+        setProfile(null);
         return;
       }
       toast.success("Logged out", { description: "Come back soon!" });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       toast.error("Error signing out", { description: msg });
+      // Clear local session state anyway to prevent being stuck in a corrupted session
+      setUser(null);
+      setProfile(null);
     } finally {
       setIsLoading(false);
     }
@@ -344,6 +361,75 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const incrementTrialsUsed = async (): Promise<boolean> => {
+    if (isMockMode) {
+      const currentTrials = Number(localStorage.getItem(`mock_trials_${user?.id}`) || "0");
+      const nextTrials = currentTrials + 1;
+      localStorage.setItem(`mock_trials_${user?.id}`, String(nextTrials));
+      
+      if (user) {
+        const updatedUser = {
+          ...user,
+          user_metadata: {
+            ...user.user_metadata,
+            trials_used: nextTrials
+          }
+        };
+        setUser(updatedUser);
+        
+        const savedMockSession = localStorage.getItem("mock_session");
+        if (savedMockSession) {
+          try {
+            const parsed = JSON.parse(savedMockSession);
+            parsed.user = updatedUser;
+            localStorage.setItem("mock_session", JSON.stringify(parsed));
+          } catch {
+            // ignore
+          }
+        }
+      }
+      return true;
+    }
+
+    if (!user) return false;
+
+    try {
+      const currentTrials = user.user_metadata?.trials_used || 0;
+      const nextTrials = currentTrials + 1;
+
+      const { data, error } = await supabase.auth.updateUser({
+        data: {
+          trials_used: nextTrials,
+        },
+      });
+
+      if (error) {
+        console.error("Error updating user metadata trials:", error);
+        return false;
+      }
+
+      if (data?.user) {
+        setUser(data.user);
+      }
+
+      try {
+        await supabase
+          .from("user_profiles")
+          .update({
+            trials_used: nextTrials,
+          } as any)
+          .eq("id", user.id);
+      } catch (profileErr) {
+        // ignore if database column does not exist
+      }
+
+      return true;
+    } catch (err) {
+      console.error("Exception incrementing trials:", err);
+      return false;
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -357,6 +443,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         signOut,
         updateProfile,
         refreshProfile,
+        incrementTrialsUsed,
       }}
     >
       {children}
