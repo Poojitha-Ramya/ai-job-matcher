@@ -89,7 +89,7 @@ function SignIn() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="pl-10 h-11"
-                  disabled={submitting || isLoading}
+                  disabled={submitting}
                 />
               </div>
             </div>
@@ -110,7 +110,7 @@ function SignIn() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="pl-10 pr-10 h-11"
-                  disabled={submitting || isLoading}
+                  disabled={submitting}
                 />
                 <button
                   type="button"
@@ -124,10 +124,10 @@ function SignIn() {
 
             <Button
               type="submit"
-              disabled={submitting || isLoading}
+              disabled={submitting}
               className="h-11 w-full rounded-xl text-base font-semibold"
             >
-              {submitting || isLoading ? (
+              {submitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Signing In...
