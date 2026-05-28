@@ -286,24 +286,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     try {
-      setIsLoading(true);
       const { error } = await supabase.auth.signOut();
       if (error) {
         toast.error("Sign out failed", { description: error.message });
-        // Clear local session state anyway to prevent being stuck in a corrupted session
-        setUser(null);
-        setProfile(null);
-        return;
+      } else {
+        toast.success("Logged out", { description: "Come back soon!" });
       }
-      toast.success("Logged out", { description: "Come back soon!" });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       toast.error("Error signing out", { description: msg });
-      // Clear local session state anyway to prevent being stuck in a corrupted session
+    } finally {
+      // ALWAYS clear local session states on client to guarantee logout
       setUser(null);
       setProfile(null);
-    } finally {
-      setIsLoading(false);
+      sessionRef.current = null;
+      userRef.current = null;
     }
   };
 
