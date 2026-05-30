@@ -22,9 +22,7 @@ AI Job Matcher is a premium, recruiter-ready full-stack web application designed
 
 2. **Student & Fresher Dashboard**
    - **Resume Matcher**: Drag & drop resume parser, ATS compatibility rating visualization, extracted skills list, and live scraping matches.
-   - **Smart Job Search**: Filter and search across cached listings. Filters include role group, location (remote/onsite), internship style, and fresher experience levels.
    - **Saved Jobs Vault**: Save listings to track and apply later.
-   - **Search History**: Track previous searches and quickly re-run them with one click.
    - **My Profile**: Fine-tune skills, target location, target title, and job type configuration.
 
 3. **Performance Optimization (Supabase Caching)**
@@ -46,7 +44,6 @@ Create a free project on [Supabase](https://supabase.com) and execute the SQL sc
 This script sets up:
 - `user_profiles` (synced automatically with user signups)
 - `saved_jobs` (user bookmarks)
-- `search_history` (user search history logging)
 - `cached_job_results` (shared job scraper caching)
 - Row Level Security (RLS) policies to ensure data separation.
 

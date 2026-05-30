@@ -60,10 +60,76 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           .single();
 
         if (error) {
+          if (error.code === "PGRST116") {
+            console.log("Profile not found in database, auto-creating profile row for user:", userId);
+            try {
+              const { data: { user: currentUser } } = await supabase.auth.getUser();
+              const fullName = currentUser?.user_metadata?.full_name || currentUser?.email?.split("@")[0] || "New User";
+              
+              const newProfile = {
+                id: userId,
+                email: currentUser?.email || "",
+                full_name: fullName,
+                avatar_url: null,
+                skills: "",
+                ats_score: 0,
+                resume_url: null,
+                resume_name: null,
+                experience_level: "Freshman/Student",
+                preferred_role: null,
+                preferred_location: null,
+                job_type: "All",
+                updated_at: new Date().toISOString()
+              };
+
+              const { data: insertedData, error: insertErr } = await supabase
+                .from("user_profiles")
+                .insert(newProfile)
+                .select("*")
+                .single();
+
+              if (insertErr) {
+                console.error("Failed to auto-create profile row:", insertErr);
+                return newProfile as UserProfile;
+              }
+              return insertedData as UserProfile;
+            } catch (createErr) {
+              console.error("Exception during profile auto-creation:", createErr);
+              return {
+                id: userId,
+                email: "",
+                full_name: "New User",
+                avatar_url: null,
+                skills: "",
+                ats_score: 0,
+                resume_url: null,
+                resume_name: null,
+                experience_level: "Freshman/Student",
+                preferred_role: null,
+                preferred_location: null,
+                job_type: "All",
+                updated_at: new Date().toISOString()
+              } as UserProfile;
+            }
+          }
           console.error("Error fetching user profile:", error);
           return null;
         }
-        return data as UserProfile;
+        
+        // Merge rich profile extras if present in local cache
+        const resData = data as UserProfile;
+        const extras = localStorage.getItem(`profile_extras_${userId}`);
+        if (extras) {
+          try {
+            return {
+              ...resData,
+              ...JSON.parse(extras)
+            } as UserProfile;
+          } catch {
+            // ignore
+          }
+        }
+        return resData;
       } catch (err) {
         console.error("Exception fetching profile:", err);
         return null;
@@ -111,41 +177,50 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     let isMounted = true;
+    const initialChecked = { current: false };
 
-    // Listen for auth changes (this fires INITIAL_SESSION synchronously/immediately)
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
+    const handleAuthEvent = async (event: string, currentSession: Session | null) => {
       if (!isMounted) return;
 
       const prevSession = sessionRef.current;
       const prevUser = userRef.current;
 
-      // Prevent infinite loop if session state has not changed
+      // Prevent duplicate event handling for same session state
       if (
+        initialChecked.current &&
         currentSession?.access_token === prevSession?.access_token &&
         currentSession?.user?.id === prevUser?.id
       ) {
-        setIsLoading(false);
         return;
       }
 
       sessionRef.current = currentSession;
       userRef.current = currentSession?.user ?? null;
 
-      // Update auth states immediately
+      // Update session and user states immediately
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
-      setIsLoading(false);
 
       if (currentSession?.user) {
+        setIsLoading(true);
         const p = await fetchProfile(currentSession.user.id);
         if (isMounted) {
           setProfile(p);
+          setIsLoading(false);
+          initialChecked.current = true;
         }
       } else {
         setProfile(null);
+        setIsLoading(false);
+        initialChecked.current = true;
       }
+    };
+
+    // Listen for subsequent auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, currentSession) => {
+      handleAuthEvent(event, currentSession);
     });
 
     return () => {
@@ -193,6 +268,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
         toast.error("Authentication failed", { description: error.message });
+        setIsLoading(false);
         return false;
       }
       toast.success("Welcome back!", { description: "Successfully logged in." });
@@ -200,9 +276,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       toast.error("An error occurred", { description: msg });
-      return false;
-    } finally {
       setIsLoading(false);
+      return false;
     }
   };
 
@@ -254,6 +329,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (error) {
         toast.error("Failed to create account", { description: error.message });
+        setIsLoading(false);
         return false;
       }
 
@@ -265,14 +341,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         toast.success("Verification email sent!", {
           description: "Please check your inbox to confirm your account.",
         });
+        setIsLoading(false);
       }
       return true;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       toast.error("An error occurred", { description: msg });
-      return false;
-    } finally {
       setIsLoading(false);
+      return false;
     }
   };
 
@@ -325,20 +401,88 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!user) return false;
 
     try {
-      const { error } = await supabase
+      // Check if user profile already exists
+      const { data: existingProfile, error: fetchErr } = await supabase
         .from("user_profiles")
-        .update({
-          ...updates,
+        .select("id")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (fetchErr) {
+        console.error("Error checking existing profile:", fetchErr);
+      }
+
+      let error;
+      const payload = {
+        ...updates,
+        updated_at: new Date().toISOString(),
+      };
+
+      const runUpdate = async (fields: any) => {
+        if (!existingProfile) {
+          return await supabase.from("user_profiles").insert({
+            id: user.id,
+            email: user.email!,
+            full_name: user.user_metadata?.full_name || null,
+            ...fields,
+          });
+        } else {
+          return await supabase.from("user_profiles").update(fields).eq("id", user.id);
+        }
+      };
+
+      const res = await runUpdate(payload);
+      error = res.error;
+
+      // Handle missing DB columns error (fallback by saving extras in localStorage)
+      if (error && (error.message.includes("column") || error.code === "42703")) {
+        console.warn("Missing database columns for rich profile fields, falling back to local storage backup.");
+        const basicFields = {
+          full_name: updates.full_name,
+          experience_level: updates.experience_level,
+          preferred_role: updates.preferred_role,
+          preferred_location: updates.preferred_location,
+          job_type: updates.job_type,
+          skills: updates.skills,
           updated_at: new Date().toISOString(),
-        })
-        .eq("id", user.id);
+        };
+        const extraFields = {
+          education_school: (updates as any).education_school,
+          education_degree: (updates as any).education_degree,
+          education_year: (updates as any).education_year,
+          experience_title: (updates as any).experience_title,
+          experience_company: (updates as any).experience_company,
+          experience_duration: (updates as any).experience_duration,
+          experience_desc: (updates as any).experience_desc,
+          certifications: (updates as any).certifications,
+        };
+        localStorage.setItem(`profile_extras_${user.id}`, JSON.stringify(extraFields));
+        
+        const fallbackRes = await runUpdate(basicFields);
+        error = fallbackRes.error;
+      }
 
       if (error) {
         toast.error("Failed to update profile", { description: error.message });
         return false;
       }
 
-      setProfile((prev) => (prev ? { ...prev, ...updates } : null));
+      setProfile((prev) => (prev ? { ...prev, ...updates } : {
+        id: user.id,
+        email: user.email!,
+        full_name: user.user_metadata?.full_name || null,
+        avatar_url: null,
+        skills: null,
+        ats_score: 0,
+        resume_url: null,
+        resume_name: null,
+        experience_level: "Freshman/Student",
+        preferred_role: null,
+        preferred_location: null,
+        job_type: "All",
+        updated_at: new Date().toISOString(),
+        ...updates
+      }));
       toast.success("Profile updated successfully!");
       return true;
     } catch (err) {

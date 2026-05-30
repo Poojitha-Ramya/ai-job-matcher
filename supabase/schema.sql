@@ -61,27 +61,7 @@ create policy "Users can manage their saved jobs"
   on public.saved_jobs for all 
   using (auth.uid() = user_id);
 
--- 3. SEARCH HISTORY
-create table if not exists public.search_history (
-  id uuid primary key default uuid_generate_v4(),
-  user_id uuid references auth.users on delete cascade not null,
-  query text,
-  role text,
-  location text,
-  job_type text,
-  experience_level text,
-  searched_at timestamp with time zone default timezone('utc'::text, now()) not null
-);
-
--- Enable RLS for search_history
-alter table public.search_history enable row level security;
-
--- Policies for search_history
-create policy "Users can manage their search history" 
-  on public.search_history for all 
-  using (auth.uid() = user_id);
-
--- 4. CACHED JOB RESULTS
+-- 3. CACHED JOB RESULTS
 create table if not exists public.cached_job_results (
   id uuid primary key default uuid_generate_v4(),
   query_hash text not null unique,
